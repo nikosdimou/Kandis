@@ -1,134 +1,91 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
-type Officer = {
-  id: number
-  name: string
-  email: string
-  photo?: string | null
-}
-
-export default function OfficersPage() {
-  const [officers, setOfficers] = useState<Officer[]>([])
-  const [newOfficer, setNewOfficer] = useState({ name: "", email: "", photo: null as File | null })
-  const [preview, setPreview] = useState<string | null>(null)
-
-  // Fetch officers
-  const fetchOfficers = async () => {
-    try {
-      const res = await fetch("/api/officers")
-      const data = await res.json()
-      setOfficers(data)
-    } catch (err) {
-      console.error("Fetch officers failed", err)
-    }
-  }
+export default function CasesPage() {
+  const [cases, setCases] = useState<any[]>([])
+  const [newCase, setNewCase] = useState({ name: "", nationality: "", status: "", officer: "" })
+  const [editId, setEditId] = useState<number | null>(null)
 
   useEffect(() => {
-    fetchOfficers()
+    fetch("/api/cases")
+      .then(res => res.json())
+      .then(setCases)
   }, [])
 
-  // Handle file select + preview
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      const file = e.target.files[0]
-      setNewOfficer({ ...newOfficer, photo: file })
-      setPreview(URL.createObjectURL(file))
-    } else {
-      setNewOfficer({ ...newOfficer, photo: null })
-      setPreview(null)
-    }
+  const handleAdd = async () => {
+    const res = await fetch("/api/cases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newCase),
+    })
+    const data = await res.json()
+    setCases([data, ...cases])
+    setNewCase({ name: "", nationality: "", status: "", officer: "" })
   }
 
-  // Create officer
-  const handleAddOfficer = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const formData = new FormData()
-    formData.append("name", newOfficer.name)
-    formData.append("email", newOfficer.email)
-    if (newOfficer.photo) formData.append("photo", newOfficer.photo)
-
-    const res = await fetch("/api/officers", { method: "POST", body: formData })
-    if (res.ok) {
-      const officer = await res.json()
-      setOfficers([officer, ...officers])
-      setNewOfficer({ name: "", email: "", photo: null })
-      setPreview(null)
-    } else {
-      alert("Upload failed")
-    }
+  const handleDelete = async (id: number) => {
+    await fetch(`/api/cases/${id}`, { method: "DELETE" })
+    setCases(cases.filter(c => c.id !== id))
   }
 
-  // Delete officer
-  const handleDeleteOfficer = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this officer?")) return
-    const res = await fetch(`/api/officers/${id}`, { method: "DELETE" })
-    if (res.ok) {
-      setOfficers(officers.filter(o => o.id !== id))
-    } else {
-      alert("Delete failed")
-    }
+  const handleUpdate = async (id: number) => {
+    const res = await fetch(`/api/cases/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newCase),
+    })
+    const data = await res.json()
+    setCases(cases.map(c => (c.id === id ? data : c)))
+    setEditId(null)
+    setNewCase({ name: "", nationality: "", status: "", officer: "" })
   }
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl mb-4">Officers CRUD</h1>
+      <h1 className="text-2xl font-bold mb-4">Immigration Cases</h1>
 
-      {/* Add Officer Form */}
-      <form onSubmit={handleAddOfficer} className="flex gap-2 mb-6 items-center">
-        <input
-          type="text"
-          placeholder="Name"
-          value={newOfficer.name}
-          onChange={e => setNewOfficer({ ...newOfficer, name: e.target.value })}
-          className="border p-2 rounded"
-          required
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={newOfficer.email}
-          onChange={e => setNewOfficer({ ...newOfficer, email: e.target.value })}
-          className="border p-2 rounded"
-          required
-        />
-        <input type="file" accept="image/*" onChange={handleFileChange} className="border p-2 rounded" />
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
-          Add
-        </button>
-        {preview && (
-          <img src={preview} alt="preview" className="w-12 h-12 rounded-full object-cover border" />
+      <div className="flex gap-2 mb-6">
+        <Input placeholder="Name" value={newCase.name} onChange={e => setNewCase({ ...newCase, name: e.target.value })} />
+        <Input placeholder="Nationality" value={newCase.nationality} onChange={e => setNewCase({ ...newCase, nationality: e.target.value })} />
+        <Input placeholder="Status" value={newCase.status} onChange={e => setNewCase({ ...newCase, status: e.target.value })} />
+        <Input placeholder="Officer" value={newCase.officer} onChange={e => setNewCase({ ...newCase, officer: e.target.value })} />
+        {editId ? (
+          <Button onClick={() => handleUpdate(editId)}>Update</Button>
+        ) : (
+          <Button onClick={handleAdd}>Add</Button>
         )}
-      </form>
-
-      {/* Officers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {officers.map(officer => (
-          <div key={officer.id} className="border p-4 rounded text-center">
-            {officer.photo ? (
-              <img
-                src={officer.photo}
-                alt={officer.name}
-                className="w-24 h-24 rounded-full mx-auto mb-2 object-cover"
-              />
-            ) : (
-              <div className="w-24 h-24 rounded-full bg-gray-300 mx-auto mb-2" />
-            )}
-            <h2 className="font-semibold">{officer.name}</h2>
-            <p className="text-sm text-gray-500">{officer.email}</p>
-            <div className="flex justify-center gap-2 mt-2">
-              {/* Delete */}
-              <button
-                onClick={() => handleDeleteOfficer(officer.id)}
-                className="bg-red-600 text-white px-2 py-1 rounded text-sm"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
       </div>
+
+      <table className="w-full border">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="p-2">ID</th>
+            <th className="p-2">Name</th>
+            <th className="p-2">Nationality</th>
+            <th className="p-2">Status</th>
+            <th className="p-2">Officer</th>
+            <th className="p-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cases.map(c => (
+            <tr key={c.id} className="border-t">
+              <td className="p-2">{c.id}</td>
+              <td className="p-2">{c.name}</td>
+              <td className="p-2">{c.nationality}</td>
+              <td className="p-2">{c.status}</td>
+              <td className="p-2">{c.officer}</td>
+              <td className="p-2 flex gap-2">
+                <Button size="sm" onClick={() => { setEditId(c.id); setNewCase(c) }}>Edit</Button>
+                <Button size="sm" variant="destructive" onClick={() => handleDelete(c.id)}>Delete</Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
